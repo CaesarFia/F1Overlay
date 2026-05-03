@@ -67,8 +67,10 @@ export const CircuitLoader={
       throw new Error(`[CircuitLoader] ${circuitKey}.json is missing centerline points array`);
     }
     const pts=rawPoints.map((p)=>new THREE.Vector3(Number(p.x),Number(p.z ?? 0),-Number(p.y)));
-    const center = pts.reduce((acc, p) => acc.add(p), new THREE.Vector3()).divideScalar(pts.length);
-    const centeredPts = pts.map((p) => p.clone().sub(center));
+    const centroid = new THREE.Vector3();
+    pts.forEach((p) => centroid.add(p));
+    centroid.divideScalar(pts.length);
+    const centeredPts = pts.map((p) => p.clone().sub(centroid));
     const spline=new CatmullRomCurve3(centeredPts,true,'catmullrom',SPLINE_TENSION);
     const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
     splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
