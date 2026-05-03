@@ -74,6 +74,29 @@ export const CircuitLoader={
     const spline=new CatmullRomCurve3(centeredPts,true,'catmullrom',SPLINE_TENSION);
     const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
     splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
+
+    // DEBUG — remove once aligned
+    const meshCenter = new THREE.Vector3(
+      (box.min.x + box.max.x) / 2,
+      (box.min.y + box.max.y) / 2,
+      (box.min.z + box.max.z) / 2
+    );
+    console.log('[debug] mesh bbox center:', meshCenter);
+    console.log('[debug] spline centroid (pre-sub):', centroid);
+    console.log('[debug] spline pt[0] — start/finish (post-sub):', centeredPts[0]);
+
+    // Red sphere = mesh bbox center
+    const red = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+    red.position.copy(meshCenter);
+    scene.add(red);
+
+    // Green sphere = spline pt[0] = start/finish line
+    const green = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
+    green.position.copy(centeredPts[0]);
+    scene.add(green);
+
+    // Blue sphere = world origin (0,0,0)
+    scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0x0000ff })));
     return {spline,modelBounds};
   },
   setSplineVisible(v){ if(splineLine) splineLine.visible=v; }
