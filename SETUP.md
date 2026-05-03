@@ -2,9 +2,7 @@
 
 ## Goal
 
-Scaffold the Vite + vanilla JavaScript project that serves as the shell for the F1 overlay. This is an OBS Browser Source delivered as a static HTML page. No framework, no TypeScript — plain ES modules with Vite as the build/dev server.
-
-> **Note:** Vite was chosen for its native GLB asset handling and fast HMR. If you have a strong reason to prefer a different build tool, discuss before changing — the GLB import pattern depends on Vite's asset pipeline.
+Scaffold the Vite + vanilla JavaScript project. Each `sources/*/index.html` is a separate Vite entry point — one per OBS Browser Source. Shared modules live in `shared/`. No TypeScript, no framework, no backend server.
 
 ---
 
@@ -21,13 +19,11 @@ Scaffold the Vite + vanilla JavaScript project that serves as the shell for the 
 npm create vite@latest . -- --template vanilla
 ```
 
-Run this in the repo root (the `.` means current directory). When prompted, confirm overwriting.
+Run in the repo root. Confirm overwriting when prompted. Then immediately replace `package.json` and `vite.config.js` as described below before running `npm install`.
 
 ---
 
 ## package.json
-
-Replace the scaffolded `package.json` with the following. Pin versions at or above these minimums:
 
 ```json
 {
@@ -41,16 +37,19 @@ Replace the scaffolded `package.json` with the following. Pin versions at or abo
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.165.0",
-    "gsap": "^3.12.0",
-    "pixi.js": "^8.0.0",
-    "@mediapipe/tasks-vision": "^0.10.0"
+    "three": "^0.165.0"
   },
   "devDependencies": {
     "vite": "^5.0.0"
   }
 }
 ```
+
+Only `three` is needed for the historical playback phase. The following packages are deferred to later phases:
+- `mqtt` — live WebSocket data (see `archive/src-worker-SPEC.md`)
+- `pixi.js` — GPU-accelerated charts (see `archive/src-pixi-SPEC.md`)
+- `gsap` — panel transition animations
+- `@mediapipe/tasks-vision` — gesture control (see `archive/src-gestures-SPEC.md`)
 
 Run `npm install` after writing this file.
 
@@ -60,45 +59,70 @@ Run `npm install` after writing this file.
 
 ```js
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   assetsInclude: ['**/*.glb'],
+
   server: {
     port: 5173,
     host: true,
   },
+
   build: {
     target: 'esnext',
     assetsDir: 'assets',
     rollupOptions: {
-      output: {
-        manualChunks: {
-          three: ['three'],
-          pixi: ['pixi.js'],
-          gsap: ['gsap'],
-        },
+      input: {
+        'track-map': resolve(__dirname, 'sources/track-map/index.html'),
+        'standings':  resolve(__dirname, 'sources/standings/index.html'),
+        'gaps':       resolve(__dirname, 'sources/gaps/index.html'),
+        'tyres':      resolve(__dirname, 'sources/tyres/index.html'),
       },
     },
-  },
-  worker: {
-    format: 'es',
   },
 });
 ```
 
-The `assetsInclude: ['**/*.glb']` line tells Vite to treat `.glb` files as static assets and return a URL string when imported. This is required for the Three.js GLTFLoader pattern:
-
-```js
-import miamiUrl from '../circuits/miami/miami.glb';
-// miamiUrl is now a string like '/assets/miami-abc123.glb'
-new GLTFLoader().load(miamiUrl, (gltf) => { ... });
-```
+**Key points:**
+- `assetsInclude: ['**/*.glb']` — Vite treats `.glb` files as static assets and returns a URL string when imported: `import miamiUrl from '../../circuits/miami.glb'` → `miamiUrl` is the resolved asset path, ready for `GLTFLoader.load()`.
+- `rollupOptions.input` — each entry builds independently. No `manualChunks` needed; Vite automatically splits shared modules.
+- No `worker: { format: 'es' }` — there are no Web Workers in this architecture.
 
 ---
 
-## index.html
+## Dev Server URLs
 
-This is the OBS Browser Source entry point. It must be 1920×1080 with a transparent background and no scrolling.
+| Source | URL |
+|---|---|
+| Track map | `http://localhost:5173/sources/track-map/` |
+| Standings | `http://localhost:5173/sources/standings/` |
+| Gaps | `http://localhost:5173/sources/gaps/` |
+| Tyres | `http://localhost:5173/sources/tyres/` |
+
+---
+
+## Directory Structure to Create
+
+Create these directories with a `.gitkeep` file in each:
+
+```
+shared/
+sources/track-map/
+sources/standings/
+sources/gaps/
+sources/tyres/
+circuits/
+public/fonts/
+```
+
+The `src/` directory from the Vite scaffold can be deleted — it is not used in this architecture.
+
+---
+
+## index.html Template
+
+Every `sources/*/index.html` follows this pattern (no shared base HTML — each source is fully self-contained):
 
 ```html
 <!DOCTYPE html>
@@ -106,129 +130,47 @@ This is the OBS Browser Source entry point. It must be 1920×1080 with a transpa
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0" />
-  <title>F1 Overlay</title>
-  <link rel="stylesheet" href="/src/styles/base.css" />
+  <title>F1 Overlay — [Source Name]</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent !important;
+      font-family: 'Formula1', 'Orbitron', monospace;
+    }
+  </style>
 </head>
 <body>
-  <!-- Layer 1: Three.js 3D circuit (background) -->
-  <canvas id="three-canvas"></canvas>
-
-  <!-- Layer 2: PixiJS GPU canvas (fast-updating graphics) -->
-  <canvas id="pixi-canvas"></canvas>
-
-  <!-- Layer 3: HTML/CSS panels (text, timing data) -->
-  <div id="panels"></div>
-
-  <!-- Hidden video feed for MediaPipe gesture detection -->
-  <video id="gesture-video" autoplay playsinline muted></video>
-
-  <!-- Dev only: gesture skeleton overlay (remove in production) -->
-  <canvas id="gesture-debug" style="display:none;"></canvas>
-
-  <script type="module" src="/src/main.js"></script>
+  <!-- Source-specific DOM goes here -->
+  <script type="module" src="./main.js"></script>
 </body>
 </html>
 ```
 
----
+**OBS requirement:** `background: transparent !important` is mandatory. OBS Browser Sources composite the page over the stream using the page's alpha channel.
 
-## src/styles/base.css
-
-Create `src/styles/base.css` with this content:
-
-```css
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body {
-  width: 1920px;
-  height: 1080px;
-  overflow: hidden;
-  background: transparent !important;
-  font-family: 'Formula1', 'Orbitron', monospace;
-}
-
-canvas,
-#panels,
-#gesture-debug {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 1920px;
-  height: 1080px;
-  pointer-events: none;
-}
-
-#three-canvas  { z-index: 1; }
-#pixi-canvas   { z-index: 2; }
-#panels        { z-index: 10; }
-#gesture-debug { z-index: 99; }
-
-#gesture-video {
-  position: absolute;
-  top: -9999px;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-```
+The `track-map` source adds canvas elements for Three.js. The panel sources (`standings`, `gaps`, `tyres`) add `<div>` containers for HTML/CSS rendering.
 
 ---
 
-## src/main.js (shell)
+## OBS Browser Source Setup
 
-Create `src/main.js` as an empty shell that will be filled in once other modules are ready. It must execute the startup sequence defined in `ARCHITECTURE.md`. For now, export a placeholder:
+For each source in OBS:
+1. Add a new Browser Source
+2. URL: `http://localhost:5173/sources/{name}/` (dev) or `file:///path/to/dist/sources/{name}/index.html` (production build)
+3. Width: 1920, Height: 1080
+4. Custom CSS: `body { background: transparent !important; }`
+5. Enable "Shutdown source when not visible" to pause the page when the scene is inactive
 
-```js
-// Entry point — see ARCHITECTURE.md for startup sequence
-// Implement after: worker, state, scene, animation, panels, gestures are all ready
-console.log('[F1 Overlay] main.js loaded');
-```
-
----
-
-## Directory Structure to Create Now
-
-Create these empty directories (create a `.gitkeep` file inside each so git tracks them):
-
-```
-src/api/
-src/worker/
-src/state/
-src/derived/
-src/scene/
-src/panels/
-src/pixi/
-src/gestures/
-src/animation/
-src/utils/
-src/styles/
-circuits/
-public/fonts/
-```
-
----
-
-## Dev Server Usage
-
-```bash
-npm run dev
-```
-
-Open `http://localhost:5173` in a browser. In OBS, add a Browser Source pointing to `http://localhost:5173` with width 1920, height 1080, and "Custom CSS" set to `body { background: transparent !important; }`.
-
-For production, run `npm run build` and serve the `dist/` folder as a static site, or point OBS directly to the built `dist/index.html` as a local file.
+URL parameters are appended directly: `http://localhost:5173/sources/track-map/?speed=3&start=25`
 
 ---
 
 ## Font
 
-The overlay targets an F1-style aesthetic. The recommended font is **Formula1 Display** (the official F1 font, available on the F1 website's asset pack or via community redistribution). Place font files in `public/fonts/` and register them in `base.css`:
+Place font files in `public/fonts/`. The Formula1 Display font (official F1 font from the F1 asset pack) is preferred. Register in each source's `<style>` block or a shared imported CSS file:
 
 ```css
 @font-face {
@@ -241,11 +183,33 @@ The overlay targets an F1-style aesthetic. The recommended font is **Formula1 Di
   src: url('/fonts/Formula1-Display-Bold.woff2') format('woff2');
   font-weight: 700;
 }
-@font-face {
-  font-family: 'Formula1';
-  src: url('/fonts/Formula1-Display-Wide.woff2') format('woff2');
-  font-weight: 900;
-}
 ```
 
-If the official font is unavailable, fall back to `Orbitron` from Google Fonts.
+Fallback: `Orbitron` from Google Fonts.
+
+---
+
+## Build for Production
+
+```bash
+npm run build
+```
+
+Outputs to `dist/`. The built structure mirrors the source layout:
+```
+dist/
+├── assets/           ← bundled JS, CSS, GLB files (content-hashed)
+├── sources/
+│   ├── track-map/index.html
+│   ├── standings/index.html
+│   ├── gaps/index.html
+│   └── tyres/index.html
+```
+
+Point OBS to the built `index.html` files using the `file://` protocol for a production setup with no running dev server.
+
+---
+
+## No .env File Needed
+
+Historical playback requires no API authentication. The session key is a plain constant in `shared/constants.js` — change it there to use a different session. When live mode is implemented in a future phase, a `.env` file will be added for OAuth2 credentials (see `archive/src-worker-SPEC.md`).
