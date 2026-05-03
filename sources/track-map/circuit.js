@@ -20,7 +20,16 @@ export const CircuitLoader={
       maxZ: box.max.z,
     };
 
-    const pts=miami.centerlinePoints.map((p)=>new THREE.Vector3(p.x,p.z ?? 0,p.y));
+    const rawPoints =
+      miami.centerlinePoints ??
+      miami.centerline_points ??
+      miami.centerline?.points ??
+      miami.points ??
+      [];
+    if (!Array.isArray(rawPoints) || rawPoints.length === 0) {
+      throw new Error('[CircuitLoader] miami.json is missing centerline points array');
+    }
+    const pts=rawPoints.map((p)=>new THREE.Vector3(p.x,p.z ?? 0,p.y));
     const spline=new CatmullRomCurve3(pts,true,'catmullrom',0.5);
     const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
     splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
