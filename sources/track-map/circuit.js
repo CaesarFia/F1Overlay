@@ -39,10 +39,15 @@ export const CircuitLoader={
     if (!jsonLoader || !glbLoader) {
       throw new Error(`[CircuitLoader] Missing circuit assets for key: ${circuitKey}`);
     }
-    const [{ default: circuitData }, { default: glbUrl }] = await Promise.all([
+    const [jsonModule, glbModule] = await Promise.all([
       jsonLoader(),
       glbLoader(),
     ]);
+    const circuitData = jsonModule?.default ?? jsonModule;
+    const glbUrl = typeof glbModule === 'string' ? glbModule : (glbModule?.default ?? glbModule);
+    if (typeof glbUrl !== 'string' || glbUrl.length === 0) {
+      throw new Error(`[CircuitLoader] Invalid GLB URL for circuit key: ${circuitKey}`);
+    }
 
     const loader = new GLTFLoader();
     const gltf = await loader.loadAsync(glbUrl);
@@ -59,7 +64,7 @@ export const CircuitLoader={
 
     const rawPoints = findCenterlinePoints(circuitData);
     if (!rawPoints) {
-      throw new Error('[CircuitLoader] miami.json is missing centerline points array');
+      throw new Error(`[CircuitLoader] ${circuitKey}.json is missing centerline points array`);
     }
     const pts=rawPoints.map((p)=>new THREE.Vector3(Number(p.x),Number(p.z ?? 0),-Number(p.y)));
     const center = pts.reduce((acc, p) => acc.add(p), new THREE.Vector3()).divideScalar(pts.length);
