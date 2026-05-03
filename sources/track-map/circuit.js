@@ -5,6 +5,30 @@ import miami from '../../circuits/miami.json';
 import miamiGlbUrl from '../../circuits/miami.glb';
 let splineLine;
 let circuitMesh;
+
+function looksLikePointArray(value) {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every((p) => p && typeof p === 'object' && 'x' in p && 'y' in p && 'z' in p);
+}
+
+function findCenterlinePoints(obj, depth = 0) {
+  if (!obj || typeof obj !== 'object' || depth > 4) return null;
+  const direct =
+    obj.centerlinePoints ??
+    obj.centerline_points ??
+    obj.centerline?.points ??
+    obj.points;
+  if (looksLikePointArray(direct)) return direct;
+
+  for (const value of Object.values(obj)) {
+    if (looksLikePointArray(value)) return value;
+    const nested = findCenterlinePoints(value, depth + 1);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 export const CircuitLoader={
   async load(_, scene){
     const loader = new GLTFLoader();
@@ -20,16 +44,11 @@ export const CircuitLoader={
       maxZ: box.max.z,
     };
 
-    const rawPoints =
-      miami.centerlinePoints ??
-      miami.centerline_points ??
-      miami.centerline?.points ??
-      miami.points ??
-      [];
-    if (!Array.isArray(rawPoints) || rawPoints.length === 0) {
+    const rawPoints = findCenterlinePoints(miami);
+    if (!rawPoints) {
       throw new Error('[CircuitLoader] miami.json is missing centerline points array');
     }
-    const pts=rawPoints.map((p)=>new THREE.Vector3(p.x,p.z ?? 0,p.y));
+    const pts=rawPoints.map((p)=>new THREE.Vector3(Number(p.x),Number(p.z ?? 0),Number(p.y)));
     const spline=new CatmullRomCurve3(pts,true,'catmullrom',0.5);
     const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
     splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
