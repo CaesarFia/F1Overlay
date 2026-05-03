@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { CatmullRomCurve3 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import miami from '../../circuits/miami.json';
-import miamiGlbUrl from '../../circuits/miami.glb';
+import { SPLINE_TENSION } from '../../shared/constants.js';
+const jsonModules = import.meta.glob('../../circuits/*.json');
+const glbUrls = import.meta.glob('../../circuits/*.glb', { query: '?url', import: 'default' });
 let splineLine;
 let circuitMesh;
 
@@ -30,9 +31,21 @@ function findCenterlinePoints(obj, depth = 0) {
 }
 
 export const CircuitLoader={
-  async load(_, scene){
+  async load(circuitKey, scene){
+    const jsonKey = `../../circuits/${circuitKey}.json`;
+    const glbKey = `../../circuits/${circuitKey}.glb`;
+    const jsonLoader = jsonModules[jsonKey];
+    const glbLoader = glbUrls[glbKey];
+    if (!jsonLoader || !glbLoader) {
+      throw new Error(`[CircuitLoader] Missing circuit assets for key: ${circuitKey}`);
+    }
+    const [{ default: circuitData }, { default: glbUrl }] = await Promise.all([
+      jsonLoader(),
+      glbLoader(),
+    ]);
+
     const loader = new GLTFLoader();
-    const gltf = await loader.loadAsync(miamiGlbUrl);
+    const gltf = await loader.loadAsync(glbUrl);
     circuitMesh = gltf.scene;
     scene.add(circuitMesh);
 
@@ -44,12 +57,14 @@ export const CircuitLoader={
       maxZ: box.max.z,
     };
 
-    const rawPoints = findCenterlinePoints(miami);
+    const rawPoints = findCenterlinePoints(circuitData);
     if (!rawPoints) {
       throw new Error('[CircuitLoader] miami.json is missing centerline points array');
     }
-    const pts=rawPoints.map((p)=>new THREE.Vector3(Number(p.x),Number(p.z ?? 0),Number(p.y)));
-    const spline=new CatmullRomCurve3(pts,true,'catmullrom',0.5);
+    const pts=rawPoints.map((p)=>new THREE.Vector3(Number(p.x),Number(p.z ?? 0),-Number(p.y)));
+    const center = pts.reduce((acc, p) => acc.add(p), new THREE.Vector3()).divideScalar(pts.length);
+    const centeredPts = pts.map((p) => p.clone().sub(center));
+    const spline=new CatmullRomCurve3(centeredPts,true,'catmullrom',SPLINE_TENSION);
     const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
     splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
     return {spline,modelBounds};

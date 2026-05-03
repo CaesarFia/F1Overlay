@@ -2,6 +2,10 @@
 // Change this to test a different session. Find keys at:
 // https://api.openf1.org/v1/sessions
 export const MIAMI_SESSION_KEY = 9580;
+export const DEFAULT_CIRCUIT = 'miami';
+export const SESSION_CIRCUIT_MAP = {
+  9580: 'miami',
+};
 
 // ── API ──────────────────────────────────────────────────────────
 export const OPENF1_BASE_URL = 'https://api.openf1.org/v1';
