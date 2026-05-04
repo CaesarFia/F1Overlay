@@ -31,5 +31,6 @@ export function calculateBounds(records) {
     minY: Math.min(acc.minY, r.y),
     maxY: Math.max(acc.maxY, r.y),
   }), seed);
+  console.log('[bounds]', bounds);
   return Number.isFinite(bounds.minX) ? bounds : { minX: 0, maxX: 1, minY: 0, maxY: 1 };
 }
