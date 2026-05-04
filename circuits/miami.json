@@ -1,7 +1,11 @@
 {
-  "circuit": "miami",
-  "totalLengthMeters": 5412,
-  "centerline": [
+  "circuitKey": "miami",
+  "circuitName": "Miami International Autodrome",
+  "country": "United States",
+  "lapLengthMeters": 5412,
+  "defaultPitTimeLoss": 22.5,
+  "splineOffset": { "x": -5, "z": 3 },
+  "centerlinePoints": [
     {"x": -14.456, "y": 10.059, "z": 1.0845},
     {"x": 0.5215, "y": 1.1902, "z": 1.0332},
     {"x": 22.382, "y": -11.521, "z": 1.0948},
