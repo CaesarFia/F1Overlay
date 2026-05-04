@@ -1,21 +1,38 @@
-let startWallClock = 0;
-let startSessionMs = 0;
-let speed = 1;
+import { DEFAULT_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED, MIN_PLAYBACK_SPEED } from './constants.js';
 
-export function init(records, { speed: startSpeed = 1, startOffsetMs = 0 } = {}) {
-  speed = startSpeed;
-  startWallClock = performance.now();
-  const minDate = records.length ? Math.min(...records.map(r => new Date(r.date).getTime())) : Date.now();
-  startSessionMs = minDate + startOffsetMs;
+let firstSessionEpochMs = 0;
+let wallClockAnchorMs = 0;
+let sessionClockAnchorMs = 0;
+let speed = DEFAULT_PLAYBACK_SPEED;
+
+export function init(records, { speed: startSpeed = DEFAULT_PLAYBACK_SPEED, startOffsetMs = 0 } = {}) {
+  firstSessionEpochMs = records.length ? new Date(records[0].date ?? records[0].date_start).getTime() : Date.now();
+  wallClockAnchorMs = performance.now();
+  sessionClockAnchorMs = firstSessionEpochMs + startOffsetMs;
+  speed = Math.max(MIN_PLAYBACK_SPEED, Math.min(MAX_PLAYBACK_SPEED, startSpeed));
 }
 
 export function getCurrentSessionTime() {
-  return startSessionMs + (performance.now() - startWallClock) * speed;
+  return sessionClockAnchorMs + (performance.now() - wallClockAnchorMs) * speed;
 }
 
-export function setSpeed(next) {
-  const now = getCurrentSessionTime();
-  speed = next;
-  startWallClock = performance.now();
-  startSessionMs = now;
+export function setSpeed(nextSpeed) {
+  const snapped = Math.max(MIN_PLAYBACK_SPEED, Math.min(MAX_PLAYBACK_SPEED, nextSpeed));
+  const current = getCurrentSessionTime();
+  speed = snapped;
+  wallClockAnchorMs = performance.now();
+  sessionClockAnchorMs = current;
+}
+
+export function jumpToLap(lapNumber, lapsData) {
+  const candidates = lapsData.filter((l) => l.lap_number === lapNumber && l.date_start);
+  if (candidates.length === 0) return false;
+  const lapStartEpoch = Math.min(...candidates.map((l) => new Date(l.date_start).getTime()));
+  wallClockAnchorMs = performance.now();
+  sessionClockAnchorMs = lapStartEpoch;
+  return true;
+}
+
+export function getState() {
+  return { firstSessionEpochMs, wallClockAnchorMs, sessionClockAnchorMs, speed };
 }
