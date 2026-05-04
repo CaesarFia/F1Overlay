@@ -1,0 +1,8 @@
+import * as THREE from 'three';
+import { DOT_RADIUS, DOT_EMISSIVE_INTENSITY, LERP_RATE } from '../../shared/constants.js';
+import { getDriverByNumber } from '../../shared/drivers.js';
+import { openF1ToModelXZ, findClosestT } from './transform.js';
+export class DriverDotManager{constructor(scene,layer,camera,renderer,spline,drivers){this.scene=scene;this.layer=layer;this.camera=camera;this.renderer=renderer;this.spline=spline;this.state=new Map();for(const d of drivers){const m=new THREE.Mesh(new THREE.SphereGeometry(DOT_RADIUS),new THREE.MeshStandardMaterial({color:Number(`0x${(d.team_colour||'ffffff')}`),emissive:Number(`0x${(d.team_colour||'ffffff')}`),emissiveIntensity:DOT_EMISSIVE_INTENSITY}));scene.add(m);const l=document.createElement('div');l.className='driver-label';l.textContent=d.name_acronym||String(d.driver_number);l.style.position='absolute';l.style.color=`#${d.team_colour||'fff'}`;layer.appendChild(l);this.state.set(String(d.driver_number),{mesh:m,label:l,currentT:0,targetT:0})}}
+ updateTarget(driverNum,record,openF1Bounds,modelBounds){if(!record)return;const s=this.state.get(String(driverNum));if(!s)return;const p=openF1ToModelXZ(record,openF1Bounds,modelBounds);s.targetT=findClosestT(this.spline,p.x,p.z)}
+ lerpAll(){for(const s of this.state.values()){if(s.targetT-s.currentT>0.5)s.currentT+=1;if(s.currentT-s.targetT>0.5)s.targetT+=1;s.currentT+=(s.targetT-s.currentT)*LERP_RATE;const p=this.spline.getPointAt((s.currentT%1+1)%1);s.mesh.position.copy(p);const v=p.clone().project(this.camera);s.label.style.transform=`translate(${960+v.x*960}px, ${540-v.y*540}px)`}}
+ setLabelsVisible(v){for(const s of this.state.values()) s.label.style.display=v?'block':'none';}}
