@@ -24,7 +24,7 @@ export const SPLINE_SAMPLE_COUNT = 600;
 
 // ── Driver Dot Rendering ─────────────────────────────────────────
 export const LERP_RATE = 0.05;
-export const DOT_RADIUS = 0.12;
+export const DOT_RADIUS = 0.4;
 export const DOT_EMISSIVE_INTENSITY = 2.5;
 
 // ── Raycast Elevation Snap ────────────────────────────────────────
