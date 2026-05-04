@@ -1,0 +1,1 @@
+export class PostProcessing{constructor(renderer,scene,camera){this.renderer=renderer;this.scene=scene;this.camera=camera;this.enabled=true}render(){this.renderer.render(this.scene,this.camera)}setEnabled(v){this.enabled=v}}
