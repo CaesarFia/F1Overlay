@@ -16,7 +16,9 @@ function sortByDate(arr, field = 'date') {
   return [...arr].sort((a, b) => (a[field] < b[field] ? -1 : 1));
 }
 
-export const fetchAllLocationData = (sessionKey) => get('location', { session_key: sessionKey }).then(sortByDate);
+export const fetchAllLocationData = (sessionKey) => get('location', { session_key: sessionKey })
+  .then((records) => records.filter((r) => r.x !== 0 || r.y !== 0))
+  .then(sortByDate);
 export const fetchDrivers = (sessionKey) => get('drivers', { session_key: sessionKey });
 export const fetchLaps = (sessionKey) => get('laps', { session_key: sessionKey }).then((d) => sortByDate(d, 'date_start'));
 export const fetchPosition = (sessionKey) => get('position', { session_key: sessionKey }).then(sortByDate);
