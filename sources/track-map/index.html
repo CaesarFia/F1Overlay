@@ -1,1 +1,20 @@
-<!doctype html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=1920,height=1080,initial-scale=1.0'><title>F1 Overlay — Track Map</title><style>html,body{width:1920px;height:1080px;overflow:hidden;background:transparent!important;color:#fff;font-family:monospace}#app{padding:20px}</style></head><body><div id='app'>Loading track map…</div><script type='module' src='./main.js'></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0" />
+  <title>F1 Overlay — Track Map</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent !important; }
+    canvas { position: absolute; top: 0; left: 0; }
+    #css2d-layer { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; pointer-events: none; }
+    .driver-label { font-family: 'Formula1', 'Orbitron', monospace; font-size: 11px; font-weight: 700; color: inherit; text-shadow: 0 0 6px currentColor; pointer-events: none; user-select: none; }
+  </style>
+</head>
+<body>
+  <canvas id="three-canvas"></canvas>
+  <div id="css2d-layer"></div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
