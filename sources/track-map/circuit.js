@@ -70,12 +70,17 @@ export const CircuitLoader={
     const centroid = new THREE.Vector3();
     pts.forEach((p) => centroid.add(p));
     centroid.divideScalar(pts.length);
+    const offset = circuitData.splineOffset ?? { x: 0, z: 0 };
     const bboxCenter = new THREE.Vector3(
       (box.min.x + box.max.x) / 2,
       0,
       (box.min.z + box.max.z) / 2
     );
-    const centeredPts = pts.map((p) => p.clone().sub(centroid).add(bboxCenter));
+    const centeredPts = pts.map((p) => p.clone().sub(centroid).add(new THREE.Vector3(
+      bboxCenter.x + offset.x,
+      0,
+      bboxCenter.z + offset.z
+    )));
     const spline=new CatmullRomCurve3(centeredPts,true,'catmullrom',SPLINE_TENSION);
     const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
     splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
