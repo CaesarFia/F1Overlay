@@ -35,7 +35,7 @@ export class DriverDotManager {
     const dot = this.dots[String(driverNumber)];
     if (!dot || !record) return;
     const mapped = openF1ToModelXZ(record.x, record.y, openF1Bounds, modelBounds);
-    dot.targetT = findClosestT(mapped.x, mapped.z, this.spline);
+    dot.targetT = findClosestT(mapped.x, mapped.z, this.spline, dot.currentT);
   }
 
   lerpAll() {
@@ -47,7 +47,8 @@ export class DriverDotManager {
       currentT += (targetT - currentT) * LERP_RATE;
       currentT = ((currentT % 1) + 1) % 1;
       dot.currentT = currentT;
-      dot.mesh.position.copy(this.spline.getPoint(currentT));
+      const p = this.spline.getPointAt(currentT);
+      dot.mesh.position.set(p.x, p.y + 0.5, p.z);
       dot.label.visible = this.labelsVisible;
     }
     this.css2dRenderer.render(this.scene, this._camera);

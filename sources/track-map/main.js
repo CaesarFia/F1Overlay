@@ -13,11 +13,12 @@ async function main() {
   const startLap = params.has('start') ? parseInt(params.get('start'), 10) : null;
   const devMode = params.has('dev');
 
-  const [locationRecords, driversArray, lapsData] = await Promise.all([
-    fetchAllLocationData(MIAMI_SESSION_KEY),
+  const [driversArray, lapsData] = await Promise.all([
     fetchDrivers(MIAMI_SESSION_KEY),
-    fetchLaps(MIAMI_SESSION_KEY)
+    fetchLaps(MIAMI_SESSION_KEY),
   ]);
+  const driverNumbers = driversArray.map(d => d.driver_number);
+  const locationRecords = await fetchAllLocationData(MIAMI_SESSION_KEY, driverNumbers);
 
   const openF1Bounds = calculateBounds(locationRecords);
   const recordsByDriver = {};
@@ -43,8 +44,8 @@ async function main() {
   driverData.init(driversArray);
 
   const scene = new SceneManager(document.getElementById('three-canvas'));
-  const { spline, modelBounds } = await CircuitLoader.load('miami', scene.scene);
-  scene.positionCamera(modelBounds);
+  const { spline, modelBounds, centerlineBounds } = await CircuitLoader.load('miami', scene.scene);
+  scene.positionCamera(centerlineBounds);
 
   const dots = new DriverDotManager(scene.scene, document.getElementById('css2d-layer'), scene.camera, scene.renderer, spline, driverData.getAllDrivers());
   const postfx = new PostProcessing(scene.renderer, scene.scene, scene.camera);
@@ -78,13 +79,18 @@ async function main() {
       driverPlaybackIndex[driverNum] = idx;
       dots.updateTarget(driverNum, records[idx], openF1Bounds, modelBounds);
     }
+    scene.tick();
     dots.lerpAll();
     postfx.render();
     const processed = Object.values(driverPlaybackIndex).reduce((s, i) => s + i, 0);
-    const elapsed = Math.floor((sessionTime - new Date(locationRecords[0].date).getTime()) / 1000);
-    const mm = Math.floor(elapsed / 60);
-    const ss = String(Math.max(0, elapsed % 60)).padStart(2, '0');
-    devPanel?.tick(`${mm}:${ss}`, processed);
+    if (locationRecords.length > 0) {
+      const elapsed = Math.floor((sessionTime - new Date(locationRecords[0].date).getTime()) / 1000);
+      const mm = Math.floor(elapsed / 60);
+      const ss = String(Math.max(0, elapsed % 60)).padStart(2, '0');
+      devPanel?.tick(`${mm}:${ss}`, processed);
+    } else {
+      devPanel?.tick('no data', processed);
+    }
     requestAnimationFrame(tick);
   });
 }

@@ -14,10 +14,10 @@ export class CircuitLoader {
       const glbModule = await import(`../../circuits/${circuitKey}.glb`);
       const gltf = await loader.loadAsync(glbModule.default);
       mesh = gltf.scene.children[0];
-      mesh.material = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.85, metalness: 0, emissive: 0x000000 });
+      mesh.material = new THREE.MeshStandardMaterial({ color: 0x334466, roughness: 0.8, metalness: 0.1, emissive: 0x112244, emissiveIntensity: 2.0 });
       scene.add(mesh);
       const jsonModule = await import(`../../circuits/${circuitKey}.json`);
-      rawPoints = jsonModule.default.centerlinePoints.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+      rawPoints = jsonModule.default.centerlinePoints.map((p) => new THREE.Vector3(p.x, p.z ?? 0, -p.y));
     } catch {
       const ring = new THREE.RingGeometry(8, 10, 64);
       ring.rotateX(-Math.PI / 2);
@@ -41,13 +41,16 @@ export class CircuitLoader {
     });
 
     const spline = new THREE.CatmullRomCurve3(correctedPoints, true, 'catmullrom', SPLINE_TENSION);
-    const points = spline.getPoints(500);
-    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const splinePoints = spline.getPoints(500);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(splinePoints);
     this._splineLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.4, transparent: true }));
     this._splineLine.visible = false;
     scene.add(this._splineLine);
 
-    return { spline, modelBounds };
+    const clBox = new THREE.Box3().setFromPoints(splinePoints);
+    const centerlineBounds = { minX: clBox.min.x, maxX: clBox.max.x, minZ: clBox.min.z, maxZ: clBox.max.z };
+
+    return { spline, modelBounds, centerlineBounds };
   }
 
   static setSplineVisible(visible) {

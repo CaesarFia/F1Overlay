@@ -19,7 +19,15 @@ async function get(endpoint, params = {}) {
 
 const sortByDate = (rows, key = 'date') => [...rows].sort((a, b) => (a[key] < b[key] ? -1 : 1));
 
-export const fetchAllLocationData = (sessionKey) => get('/location', { session_key: sessionKey }).then((r) => sortByDate(r));
+export async function fetchAllLocationData(sessionKey, driverNumbers) {
+  const results = [];
+  for (const num of driverNumbers) {
+    const records = await get('/location', { session_key: sessionKey, driver_number: num });
+    results.push(...records);
+    await new Promise(r => setTimeout(r, 400)); // stay under 3 req/sec rate limit
+  }
+  return sortByDate(results.filter(r => r.x !== 0 || r.y !== 0));
+}
 export const fetchDrivers = (sessionKey) => get('/drivers', { session_key: sessionKey });
 export const fetchLaps = (sessionKey) => get('/laps', { session_key: sessionKey }).then((r) => sortByDate(r, 'date_start'));
 export const fetchStints = (sessionKey) => get('/stints', { session_key: sessionKey });
