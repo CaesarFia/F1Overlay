@@ -10,12 +10,27 @@
     canvas { position: absolute; top: 0; left: 0; }
     #css2d-layer { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; pointer-events: none; }
     .driver-label { font-family: 'Formula1', 'Orbitron', monospace; font-size: 11px; font-weight: 700; color: inherit; text-shadow: 0 0 6px currentColor; pointer-events: none; user-select: none; }
+    #startup-status { position: absolute; left: 50%; bottom: 74px; width: 520px; padding: 24px 26px 22px; transform: translateX(-50%); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 28px; background: linear-gradient(145deg, rgba(250, 250, 252, 0.9), rgba(235, 238, 243, 0.78)); box-shadow: 0 24px 70px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9); color: #111317; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Helvetica Neue', Arial, sans-serif; letter-spacing: -0.02em; pointer-events: none; backdrop-filter: blur(22px) saturate(1.4); transition: opacity 520ms ease, transform 520ms ease; }
+    #startup-status.is-complete { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.985); }
+    .startup-kicker { margin-bottom: 8px; color: rgba(17, 19, 23, 0.58); font-size: 12px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+    .startup-phase { font-size: 28px; font-weight: 700; line-height: 1.05; }
+    .startup-detail { margin-top: 8px; color: rgba(17, 19, 23, 0.68); font-size: 15px; font-weight: 500; line-height: 1.35; }
+    .startup-meter { height: 5px; margin-top: 19px; overflow: hidden; border-radius: 999px; background: rgba(17, 19, 23, 0.1); }
+    .startup-meter span { display: block; width: 100%; height: 100%; transform: scaleX(0.08); transform-origin: left center; border-radius: inherit; background: linear-gradient(90deg, #111317, #4a4f58); transition: transform 360ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .startup-count { margin-top: 11px; color: rgba(17, 19, 23, 0.52); font-size: 13px; font-weight: 600; letter-spacing: 0.01em; }
     #error { position:absolute; top:8px; left:8px; color:#f88; font-family:monospace; }
   </style>
 </head>
 <body>
   <canvas id="three-canvas"></canvas>
   <div id="css2d-layer"></div>
+  <div id="startup-status" aria-live="polite">
+    <div class="startup-kicker">F1 Overlay</div>
+    <div class="startup-phase" data-loading-phase>Preparing circuit</div>
+    <div class="startup-detail" data-loading-detail>Bringing the Miami track model online.</div>
+    <div class="startup-meter"><span data-loading-bar></span></div>
+    <div class="startup-count" data-loading-count>Track map</div>
+  </div>
   <div id="error"></div>
   <script type="module" src="./main.js"></script>
 </body>
