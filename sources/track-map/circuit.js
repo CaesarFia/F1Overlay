@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { CENTERLINE_RAYCAST_OFFSET, SPLINE_TENSION } from '../../shared/constants.js';
 
+const TRACK_SURFACE_COLOR = 0x8f949b;
+
 export class CircuitLoader {
   static _splineLine = null;
 
@@ -14,7 +16,7 @@ export class CircuitLoader {
       const glbModule = await import(`../../circuits/${circuitKey}.glb`);
       const gltf = await loader.loadAsync(glbModule.default);
       mesh = gltf.scene;
-      const trackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+      const trackMaterial = new THREE.MeshBasicMaterial({ color: TRACK_SURFACE_COLOR, side: THREE.DoubleSide });
       mesh.traverse((child) => {
         if (child.isMesh) {
           child.material = trackMaterial;
@@ -26,7 +28,7 @@ export class CircuitLoader {
     } catch {
       const ring = new THREE.RingGeometry(8, 10, 64);
       ring.rotateX(-Math.PI / 2);
-      mesh = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide }));
+      mesh = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: TRACK_SURFACE_COLOR, side: THREE.DoubleSide }));
       scene.add(mesh);
       rawPoints = Array.from({ length: 120 }, (_, i) => {
         const t = (i / 120) * Math.PI * 2;
