@@ -19,11 +19,18 @@ async function get(endpoint, params = {}) {
 
 const sortByDate = (rows, key = 'date') => [...rows].sort((a, b) => (a[key] < b[key] ? -1 : 1));
 
-export async function fetchAllLocationData(sessionKey, driverNumbers) {
+export async function fetchAllLocationData(sessionKey, driverNumbers, onProgress) {
   const results = [];
-  for (const num of driverNumbers) {
+  for (const [index, num] of driverNumbers.entries()) {
     const records = await get('/location', { session_key: sessionKey, driver_number: num });
     results.push(...records);
+    onProgress?.({
+      current: index + 1,
+      total: driverNumbers.length,
+      driverNumber: num,
+      records: records.length,
+      totalRecords: results.length
+    });
     await new Promise(r => setTimeout(r, 400)); // stay under 3 req/sec rate limit
   }
   return sortByDate(results.filter(r => r.x !== 0 || r.y !== 0));
