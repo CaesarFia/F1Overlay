@@ -1,113 +1,56 @@
 import * as THREE from 'three';
-import { CatmullRomCurve3 } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { SPLINE_TENSION } from '../../shared/constants.js';
-const jsonModules = import.meta.glob('../../circuits/*.json');
-const glbUrls = import.meta.glob('../../circuits/*.glb', { query: '?url', import: 'default' });
-let splineLine;
-let circuitMesh;
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CENTERLINE_RAYCAST_OFFSET, SPLINE_TENSION } from '../../shared/constants.js';
 
-function looksLikePointArray(value) {
-  return Array.isArray(value)
-    && value.length > 0
-    && value.every((p) => p && typeof p === 'object' && 'x' in p && 'y' in p && 'z' in p);
-}
+export class CircuitLoader {
+  static _splineLine = null;
 
-function findCenterlinePoints(obj, depth = 0) {
-  if (!obj || typeof obj !== 'object' || depth > 4) return null;
-  const direct =
-    obj.centerlinePoints ??
-    obj.centerline_points ??
-    obj.centerline?.points ??
-    obj.points;
-  if (looksLikePointArray(direct)) return direct;
-
-  for (const value of Object.values(obj)) {
-    if (looksLikePointArray(value)) return value;
-    const nested = findCenterlinePoints(value, depth + 1);
-    if (nested) return nested;
-  }
-  return null;
-}
-
-export const CircuitLoader={
-  async load(circuitKey, scene){
-    const jsonKey = `../../circuits/${circuitKey}.json`;
-    const glbKey = `../../circuits/${circuitKey}.glb`;
-    const jsonLoader = jsonModules[jsonKey];
-    const glbLoader = glbUrls[glbKey];
-    if (!jsonLoader || !glbLoader) {
-      throw new Error(`[CircuitLoader] Missing circuit assets for key: ${circuitKey}`);
-    }
-    const [jsonModule, glbModule] = await Promise.all([
-      jsonLoader(),
-      glbLoader(),
-    ]);
-    const circuitData = jsonModule?.default ?? jsonModule;
-    const glbUrl = typeof glbModule === 'string' ? glbModule : (glbModule?.default ?? glbModule);
-    if (typeof glbUrl !== 'string' || glbUrl.length === 0) {
-      throw new Error(`[CircuitLoader] Invalid GLB URL for circuit key: ${circuitKey}`);
-    }
-
+  static async load(circuitKey, scene) {
     const loader = new GLTFLoader();
-    const gltf = await loader.loadAsync(glbUrl);
-    circuitMesh = gltf.scene;
-    scene.add(circuitMesh);
+    let mesh;
+    let rawPoints;
 
-    const box = new THREE.Box3().setFromObject(circuitMesh);
-    const modelBounds = {
-      minX: box.min.x,
-      maxX: box.max.x,
-      minZ: box.min.z,
-      maxZ: box.max.z,
-    };
-
-    const rawPoints = findCenterlinePoints(circuitData);
-    if (!rawPoints) {
-      throw new Error(`[CircuitLoader] ${circuitKey}.json is missing centerline points array`);
+    try {
+      const glbModule = await import(`../../circuits/${circuitKey}.glb`);
+      const gltf = await loader.loadAsync(glbModule.default);
+      mesh = gltf.scene.children[0];
+      mesh.material = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.85, metalness: 0, emissive: 0x000000 });
+      scene.add(mesh);
+      const jsonModule = await import(`../../circuits/${circuitKey}.json`);
+      rawPoints = jsonModule.default.centerlinePoints.map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    } catch {
+      const ring = new THREE.RingGeometry(8, 10, 64);
+      ring.rotateX(-Math.PI / 2);
+      mesh = new THREE.Mesh(ring, new THREE.MeshStandardMaterial({ color: 0x1a1a2e, side: THREE.DoubleSide }));
+      scene.add(mesh);
+      rawPoints = Array.from({ length: 120 }, (_, i) => {
+        const t = (i / 120) * Math.PI * 2;
+        return new THREE.Vector3(Math.cos(t) * 9, 0, Math.sin(t) * 9);
+      });
     }
-    const pts=rawPoints.map((p)=>new THREE.Vector3(Number(p.x),Number(p.z ?? 0),-Number(p.y)));
-    const centroid = new THREE.Vector3();
-    pts.forEach((p) => centroid.add(p));
-    centroid.divideScalar(pts.length);
-    const offset = circuitData.splineOffset ?? { x: 0, z: 0 };
-    const bboxCenter = new THREE.Vector3(
-      (box.min.x + box.max.x) / 2,
-      0,
-      (box.min.z + box.max.z) / 2
-    );
-    const centeredPts = pts.map((p) => p.clone().sub(centroid).add(new THREE.Vector3(
-      bboxCenter.x + offset.x,
-      0,
-      bboxCenter.z + offset.z
-    )));
-    const spline=new CatmullRomCurve3(centeredPts,true,'catmullrom',SPLINE_TENSION);
-    const geo=new THREE.BufferGeometry().setFromPoints(spline.getPoints(1000));
-    splineLine=new THREE.LineLoop(geo,new THREE.LineBasicMaterial({color:0x444444}));scene.add(splineLine);
 
-    // DEBUG — remove once aligned
-    const meshCenter = new THREE.Vector3(
-      (box.min.x + box.max.x) / 2,
-      (box.min.y + box.max.y) / 2,
-      (box.min.z + box.max.z) / 2
-    );
-    console.log('[debug] mesh bbox center:', meshCenter);
-    console.log('[debug] spline centroid (pre-sub):', centroid);
-    console.log('[debug] spline pt[0] — start/finish (post-sub):', centeredPts[0]);
+    const box = new THREE.Box3().setFromObject(mesh);
+    const modelBounds = { minX: box.min.x, maxX: box.max.x, minZ: box.min.z, maxZ: box.max.z };
 
-    // Red sphere = mesh bbox center
-    const red = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-    red.position.copy(meshCenter);
-    scene.add(red);
+    const raycaster = new THREE.Raycaster();
+    const correctedPoints = rawPoints.map((p) => {
+      raycaster.set(new THREE.Vector3(p.x, p.y + 5, p.z), new THREE.Vector3(0, -1, 0));
+      const hits = raycaster.intersectObject(mesh, true);
+      if (hits.length > 0) return hits[0].point.clone().add(new THREE.Vector3(0, CENTERLINE_RAYCAST_OFFSET, 0));
+      return p;
+    });
 
-    // Green sphere = spline pt[0] = start/finish line
-    const green = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
-    green.position.copy(centeredPts[0]);
-    scene.add(green);
+    const spline = new THREE.CatmullRomCurve3(correctedPoints, true, 'catmullrom', SPLINE_TENSION);
+    const points = spline.getPoints(500);
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+    this._splineLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.4, transparent: true }));
+    this._splineLine.visible = false;
+    scene.add(this._splineLine);
 
-    // Blue sphere = world origin (0,0,0)
-    scene.add(new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshBasicMaterial({ color: 0x0000ff })));
-    return {spline,modelBounds};
-  },
-  setSplineVisible(v){ if(splineLine) splineLine.visible=v; }
-};
+    return { spline, modelBounds };
+  }
+
+  static setSplineVisible(visible) {
+    if (this._splineLine) this._splineLine.visible = visible;
+  }
+}

@@ -1,10 +1,10 @@
-let roster = [];
+let drivers = [];
 let byNumber = new Map();
 
-export function init(driversArray) {
-  roster = [...driversArray];
-  byNumber = new Map(roster.map((d) => [String(d.driver_number), d]));
+export function init(list) {
+  drivers = Array.isArray(list) ? list : [];
+  byNumber = new Map(drivers.map((d) => [String(d.driver_number), d]));
 }
 
-export function getAllDrivers() { return roster; }
-export function getDriverByNumber(driverNumber) { return byNumber.get(String(driverNumber)) ?? null; }
+export function getAllDrivers() { return drivers; }
+export function getDriver(driverNumber) { return byNumber.get(String(driverNumber)); }

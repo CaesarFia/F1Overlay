@@ -1,10 +1,27 @@
 import * as THREE from 'three';
-import { BOUNDS_MARGIN, SPLINE_SAMPLE_COUNT } from '../../shared/constants.js';
-export function openF1ToModelXZ(record, openF1Bounds, modelBounds){
-  const dx=openF1Bounds.maxX-openF1Bounds.minX; const dy=openF1Bounds.maxY-openF1Bounds.minY;
-  const nx=(record.x-openF1Bounds.minX)/dx; const ny=(record.y-openF1Bounds.minY)/dy;
-  const px=THREE.MathUtils.lerp(modelBounds.minX,modelBounds.maxX,nx*(1-2*BOUNDS_MARGIN)+BOUNDS_MARGIN);
-  const pz=THREE.MathUtils.lerp(modelBounds.minZ,modelBounds.maxZ,ny*(1-2*BOUNDS_MARGIN)+BOUNDS_MARGIN);
-  return {x:px,z:pz};
+import { SPLINE_SAMPLE_COUNT } from '../../shared/constants.js';
+
+export function openF1ToModelXZ(x, y, openF1Bounds, modelBounds) {
+  const nx = (x - openF1Bounds.minX) / (openF1Bounds.maxX - openF1Bounds.minX || 1);
+  const ny = (y - openF1Bounds.minY) / (openF1Bounds.maxY - openF1Bounds.minY || 1);
+  return {
+    x: modelBounds.minX + nx * (modelBounds.maxX - modelBounds.minX),
+    z: modelBounds.minZ + ny * (modelBounds.maxZ - modelBounds.minZ)
+  };
 }
-export function findClosestT(spline, x, z){let bestT=0,best=Infinity;for(let i=0;i<=SPLINE_SAMPLE_COUNT;i++){const t=i/SPLINE_SAMPLE_COUNT;const p=spline.getPointAt(t);const d=(p.x-x)**2+(p.z-z)**2;if(d<best){best=d;bestT=t}}return bestT}
+
+export function findClosestT(modelX, modelZ, spline) {
+  const target = new THREE.Vector3(modelX, 0, modelZ);
+  let bestT = 0;
+  let bestD = Infinity;
+  for (let i = 0; i <= SPLINE_SAMPLE_COUNT; i += 1) {
+    const t = i / SPLINE_SAMPLE_COUNT;
+    const p = spline.getPoint(t);
+    const d = p.distanceToSquared(target);
+    if (d < bestD) {
+      bestD = d;
+      bestT = t;
+    }
+  }
+  return bestT;
+}

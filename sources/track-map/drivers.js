@@ -1,8 +1,57 @@
 import * as THREE from 'three';
-import { DOT_RADIUS, DOT_EMISSIVE_INTENSITY, LERP_RATE } from '../../shared/constants.js';
-import { getDriverByNumber } from '../../shared/drivers.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { openF1ToModelXZ, findClosestT } from './transform.js';
-export class DriverDotManager{constructor(scene,layer,camera,renderer,spline,drivers){this.scene=scene;this.layer=layer;this.camera=camera;this.renderer=renderer;this.spline=spline;this.state=new Map();for(const d of drivers){const m=new THREE.Mesh(new THREE.SphereGeometry(DOT_RADIUS),new THREE.MeshStandardMaterial({color:Number(`0x${(d.team_colour||'ffffff')}`),emissive:Number(`0x${(d.team_colour||'ffffff')}`),emissiveIntensity:DOT_EMISSIVE_INTENSITY}));scene.add(m);const l=document.createElement('div');l.className='driver-label';l.textContent=d.name_acronym||String(d.driver_number);l.style.position='absolute';l.style.color=`#${d.team_colour||'fff'}`;layer.appendChild(l);this.state.set(String(d.driver_number),{mesh:m,label:l,currentT:0,targetT:0})}}
- updateTarget(driverNum,record,openF1Bounds,modelBounds){if(!record)return;const s=this.state.get(String(driverNum));if(!s)return;const p=openF1ToModelXZ(record,openF1Bounds,modelBounds);s.targetT=findClosestT(this.spline,p.x,p.z)}
- lerpAll(){for(const s of this.state.values()){let diff=s.targetT-s.currentT;if(diff>0.5)diff-=1;if(diff<-0.5)diff+=1;s.currentT=((s.currentT+diff*LERP_RATE)%1+1)%1;const p=this.spline.getPointAt(s.currentT);s.mesh.position.set(p.x,p.y+0.8,p.z);const v=p.clone().project(this.camera);s.label.style.transform=`translate(${960+v.x*960}px, ${540-v.y*540}px)`}}
- setLabelsVisible(v){for(const s of this.state.values()) s.label.style.display=v?'block':'none';}}
+import { LERP_RATE, DOT_RADIUS, DOT_EMISSIVE_INTENSITY } from '../../shared/constants.js';
+
+export class DriverDotManager {
+  constructor(scene, css2dContainer, camera, renderer, spline, allDrivers) {
+    this.scene = scene;
+    this.spline = spline;
+    this.dots = {};
+    this.labelsVisible = true;
+    this.css2dRenderer = new CSS2DRenderer({ element: css2dContainer });
+    this.css2dRenderer.setSize(1920, 1080);
+    this._camera = camera;
+    this._renderer = renderer;
+    for (const driver of allDrivers) this._createDot(driver);
+  }
+
+  _createDot(driver) {
+    const teamColor = `#${driver.team_colour || 'ffffff'}`;
+    const color = new THREE.Color(teamColor);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(DOT_RADIUS, 16, 16), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: DOT_EMISSIVE_INTENSITY, roughness: 0.2 }));
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'driver-label';
+    labelDiv.textContent = driver.name_acronym || String(driver.driver_number);
+    labelDiv.style.color = teamColor;
+    const label = new CSS2DObject(labelDiv);
+    label.position.set(0, 0.25, 0);
+    mesh.add(label);
+    this.scene.add(mesh);
+    this.dots[String(driver.driver_number)] = { mesh, currentT: 0, targetT: 0, label };
+  }
+
+  updateTarget(driverNumber, record, openF1Bounds, modelBounds) {
+    const dot = this.dots[String(driverNumber)];
+    if (!dot || !record) return;
+    const mapped = openF1ToModelXZ(record.x, record.y, openF1Bounds, modelBounds);
+    dot.targetT = findClosestT(mapped.x, mapped.z, this.spline);
+  }
+
+  lerpAll() {
+    for (const dot of Object.values(this.dots)) {
+      let { currentT, targetT } = dot;
+      const diff = targetT - currentT;
+      if (diff > 0.5) targetT -= 1;
+      if (diff < -0.5) targetT += 1;
+      currentT += (targetT - currentT) * LERP_RATE;
+      currentT = ((currentT % 1) + 1) % 1;
+      dot.currentT = currentT;
+      dot.mesh.position.copy(this.spline.getPoint(currentT));
+      dot.label.visible = this.labelsVisible;
+    }
+    this.css2dRenderer.render(this.scene, this._camera);
+  }
+
+  setLabelsVisible(v) { this.labelsVisible = v; }
+}

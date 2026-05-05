@@ -1,44 +1,44 @@
 export class DevPanel {
-  constructor(opts) { this.opts = opts; }
+  constructor(hooks) {
+    this.hooks = hooks;
+    this.status = null;
+  }
 
   mount() {
-    const p = document.createElement('div');
-    p.style.cssText = 'position:absolute;top:8px;left:8px;background:#111c;color:#fff;padding:8px;font:12px monospace;z-index:10';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'position:absolute;right:12px;top:12px;width:280px;background:rgba(0,0,0,.7);color:#fff;padding:10px;font:12px monospace;z-index:9';
 
-    const status = document.createElement('div');
-    status.textContent = 'Dev Panel';
-
+    const speedLabel = document.createElement('label');
+    speedLabel.textContent = 'Speed ';
     const speed = document.createElement('input');
     speed.type = 'range';
     speed.min = '0.1';
     speed.max = '20';
     speed.step = '0.1';
-    speed.value = '1';
-    speed.addEventListener('input', () => this.opts.onSpeedChange(Number(speed.value)));
+    speed.value = String(this.hooks.getPlayback().getSpeed());
+    speed.addEventListener('input', () => this.hooks.onSpeedChange(Number(speed.value)));
+    speedLabel.append(speed);
 
-    const lapInput = document.createElement('input');
-    lapInput.type = 'number';
-    lapInput.min = '1';
-    lapInput.max = '78';
-    lapInput.value = '1';
-    lapInput.style.cssText = 'width:50px;margin-right:4px';
+    const jumpLabel = document.createElement('label');
+    jumpLabel.textContent = ' Jump lap ';
+    const jumpInput = document.createElement('input');
+    jumpInput.type = 'number';
+    jumpInput.min = '1';
+    jumpInput.value = '1';
+    jumpInput.style.cssText = 'width:52px;margin-left:4px';
+    const jumpButton = document.createElement('button');
+    jumpButton.textContent = 'Jump';
+    jumpButton.addEventListener('click', () => this.hooks.onJumpToLap(Number(jumpInput.value)));
+    jumpLabel.append(jumpInput, jumpButton);
 
-    const jumpBtn = document.createElement('button');
-    jumpBtn.textContent = 'Jump';
-    jumpBtn.addEventListener('click', () => {
-      const n = parseInt(lapInput.value, 10);
-      if (!Number.isNaN(n)) this.opts.onJumpToLap?.(n);
-    });
+    this.status = document.createElement('div');
+    this.status.textContent = 't=0:00  processed=0';
 
-    const lapRow = document.createElement('div');
-    lapRow.append('Lap: ', lapInput, jumpBtn);
-
-    p.append(status, speed, lapRow);
-    document.body.appendChild(p);
-    this.status = status;
+    panel.append(speedLabel, document.createElement('br'), jumpLabel, document.createElement('br'), this.status);
+    document.body.append(panel);
   }
 
-  tick(sessionTime, processed) {
-    if (this.status) this.status.textContent = `t=${Math.floor(sessionTime)} processed=${processed}`;
+  tick(timeStr, processed) {
+    if (this.status) this.status.textContent = `t=${timeStr}  processed=${processed}`;
   }
 }

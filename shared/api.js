@@ -1,38 +1,51 @@
-import { OPENF1_BASE_URL } from './constants.js';
+import { BOUNDS_MARGIN, OPENF1_BASE_URL } from './constants.js';
 
 async function get(endpoint, params = {}) {
-  const query = new URLSearchParams(params).toString();
-  const url = `${OPENF1_BASE_URL}/${endpoint}?${query}`;
+  const url = new URL(`${OPENF1_BASE_URL}${endpoint}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+
   try {
-    const res = await fetch(url);
-    if (!res.ok) return [];
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      console.warn(`[api] ${endpoint} -> ${res.status}`);
+      return [];
+    }
     return await res.json();
-  } catch {
+  } catch (err) {
+    console.warn(`[api] ${endpoint} failed:`, err.message);
     return [];
   }
 }
 
-function sortByDate(arr, field = 'date') {
-  return [...arr].sort((a, b) => (a[field] < b[field] ? -1 : 1));
-}
+const sortByDate = (rows, key = 'date') => [...rows].sort((a, b) => (a[key] < b[key] ? -1 : 1));
 
-export const fetchAllLocationData = (sessionKey) => get('location', { session_key: sessionKey })
-  .then((records) => records.filter((r) => r.x !== 0 || r.y !== 0))
-  .then(sortByDate);
-export const fetchDrivers = (sessionKey) => get('drivers', { session_key: sessionKey });
-export const fetchLaps = (sessionKey) => get('laps', { session_key: sessionKey }).then((d) => sortByDate(d, 'date_start'));
-export const fetchPosition = (sessionKey) => get('position', { session_key: sessionKey }).then(sortByDate);
-export const fetchStints = (sessionKey) => get('stints', { session_key: sessionKey });
-export const fetchPit = (sessionKey) => get('pit', { session_key: sessionKey });
+export const fetchAllLocationData = (sessionKey) => get('/location', { session_key: sessionKey }).then((r) => sortByDate(r));
+export const fetchDrivers = (sessionKey) => get('/drivers', { session_key: sessionKey });
+export const fetchLaps = (sessionKey) => get('/laps', { session_key: sessionKey }).then((r) => sortByDate(r, 'date_start'));
+export const fetchStints = (sessionKey) => get('/stints', { session_key: sessionKey });
+export const fetchPit = (sessionKey) => get('/pit', { session_key: sessionKey }).then((r) => sortByDate(r));
+export const fetchPosition = (sessionKey) => get('/position', { session_key: sessionKey }).then((r) => sortByDate(r));
 
 export function calculateBounds(records) {
-  const seed = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
-  const bounds = records.reduce((acc, r) => ({
-    minX: Math.min(acc.minX, r.x),
-    maxX: Math.max(acc.maxX, r.x),
-    minY: Math.min(acc.minY, r.y),
-    maxY: Math.max(acc.maxY, r.y),
-  }), seed);
+  let minX = Infinity; let maxX = -Infinity;
+  let minY = Infinity; let maxY = -Infinity;
+
+  for (const r of records) {
+    if (typeof r.x !== 'number' || typeof r.y !== 'number') continue;
+    if (r.x < minX) minX = r.x;
+    if (r.x > maxX) maxX = r.x;
+    if (r.y < minY) minY = r.y;
+    if (r.y > maxY) maxY = r.y;
+  }
+
+  const rangeX = maxX - minX;
+  const rangeY = maxY - minY;
+  const bounds = {
+    minX: minX - rangeX * BOUNDS_MARGIN,
+    maxX: maxX + rangeX * BOUNDS_MARGIN,
+    minY: minY - rangeY * BOUNDS_MARGIN,
+    maxY: maxY + rangeY * BOUNDS_MARGIN
+  };
   console.log('[bounds]', bounds);
-  return Number.isFinite(bounds.minX) ? bounds : { minX: 0, maxX: 1, minY: 0, maxY: 1 };
+  return bounds;
 }

@@ -1,3 +1,6 @@
 export function initGestures() {
-  return null;
+  return {
+    enabled: false,
+    reason: 'MediaPipe gesture controls are deferred in this phase.'
+  };
 }

@@ -1,38 +1,40 @@
 import { DEFAULT_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED, MIN_PLAYBACK_SPEED } from './constants.js';
 
-let firstSessionEpochMs = 0;
-let wallClockAnchorMs = 0;
-let sessionClockAnchorMs = 0;
-let speed = DEFAULT_PLAYBACK_SPEED;
+let _realAnchor = 0;
+let _sessionAnchor = 0;
+let _speed = DEFAULT_PLAYBACK_SPEED;
+let _initialized = false;
 
-export function init(records, { speed: startSpeed = DEFAULT_PLAYBACK_SPEED, startOffsetMs = 0 } = {}) {
-  firstSessionEpochMs = records.length ? new Date(records[0].date ?? records[0].date_start).getTime() : Date.now();
-  wallClockAnchorMs = performance.now();
-  sessionClockAnchorMs = firstSessionEpochMs + startOffsetMs;
-  speed = Math.max(MIN_PLAYBACK_SPEED, Math.min(MAX_PLAYBACK_SPEED, startSpeed));
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+export function init(records, { speed = DEFAULT_PLAYBACK_SPEED, startOffsetMs = 0 } = {}) {
+  const firstDate = records[0]?.date || records[0]?.date_start;
+  const baseMs = firstDate ? new Date(firstDate).getTime() : Date.now();
+  _speed = clamp(Number(speed) || DEFAULT_PLAYBACK_SPEED, MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED);
+  _realAnchor = Date.now();
+  _sessionAnchor = baseMs + startOffsetMs;
+  _initialized = true;
 }
 
 export function getCurrentSessionTime() {
-  return sessionClockAnchorMs + (performance.now() - wallClockAnchorMs) * speed;
+  if (!_initialized) return Date.now();
+  return _sessionAnchor + (Date.now() - _realAnchor) * _speed;
 }
 
-export function setSpeed(nextSpeed) {
-  const snapped = Math.max(MIN_PLAYBACK_SPEED, Math.min(MAX_PLAYBACK_SPEED, nextSpeed));
-  const current = getCurrentSessionTime();
-  speed = snapped;
-  wallClockAnchorMs = performance.now();
-  sessionClockAnchorMs = current;
+export function setSpeed(newSpeed) {
+  const currentTime = getCurrentSessionTime();
+  _speed = clamp(Number(newSpeed) || DEFAULT_PLAYBACK_SPEED, MIN_PLAYBACK_SPEED, MAX_PLAYBACK_SPEED);
+  _realAnchor = Date.now();
+  _sessionAnchor = currentTime;
 }
 
 export function jumpToLap(lapNumber, lapsData) {
-  const candidates = lapsData.filter((l) => l.lap_number === lapNumber && l.date_start);
-  if (candidates.length === 0) return false;
-  const lapStartEpoch = Math.min(...candidates.map((l) => new Date(l.date_start).getTime()));
-  wallClockAnchorMs = performance.now();
-  sessionClockAnchorMs = lapStartEpoch;
+  const candidates = lapsData.filter((l) => Number(l.lap_number) === Number(lapNumber) && l.date_start);
+  if (!candidates.length) return false;
+  const earliest = Math.min(...candidates.map((l) => new Date(l.date_start).getTime()));
+  _realAnchor = Date.now();
+  _sessionAnchor = earliest;
   return true;
 }
 
-export function getState() {
-  return { firstSessionEpochMs, wallClockAnchorMs, sessionClockAnchorMs, speed };
-}
+export function getSpeed() { return _speed; }
